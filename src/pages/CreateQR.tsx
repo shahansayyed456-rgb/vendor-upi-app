@@ -80,7 +80,7 @@ export const CreateQR: React.FC<CreateQRProps> = ({
     });
 
     setGeneratedVendor(saved);
-    playPaymentSound(saved.name);
+    playPaymentSound(saved.name, saved.amount);
     showToast(
       'UPI QR Created Successfully!',
       `Generated direct payment QR for ${saved.name}.`,
