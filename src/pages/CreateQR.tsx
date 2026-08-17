@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { BusinessCategory, PaymentMethodBefore, Vendor } from '../types';
 import { isValidVPA } from '../utils/upi';
+import { playPaymentSound } from '../utils/sound';
 import { QRDisplay } from '../components/QRDisplay';
 
 interface CreateQRProps {
@@ -79,6 +80,7 @@ export const CreateQR: React.FC<CreateQRProps> = ({
     });
 
     setGeneratedVendor(saved);
+    playPaymentSound();
     showToast(
       'UPI QR Created Successfully!',
       `Generated direct payment QR for ${saved.name}.`,

@@ -1,8 +1,9 @@
 import React, { useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Download, Printer, Copy, Check, Sparkles } from 'lucide-react';
+import { Download, Printer, Copy, Check, Sparkles, Volume2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { buildUPIPayURI } from '../utils/upi';
+import { playPaymentSound } from '../utils/sound';
 import type { Vendor } from '../types';
 
 interface QRDisplayProps {
@@ -180,6 +181,14 @@ export const QRDisplay: React.FC<QRDisplayProps> = ({
             ) : (
               <Copy className="w-4 h-4" />
             )}
+          </button>
+
+          <button
+            onClick={playPaymentSound}
+            className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-medium transition-all active:scale-95"
+            title="Play Payment Received Sound (Soundbox Demo)"
+          >
+            <Volume2 className="w-4 h-4" />
           </button>
         </div>
       )}
