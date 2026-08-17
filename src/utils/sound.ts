@@ -1,7 +1,7 @@
 /**
  * VendorUPI Sound Engine
- * Uses Web Audio API to generate a real-time "Payment Received" soundbox tone.
- * No external audio file needed — pure synthesized sound.
+ * Uses Web Audio API (chime) + Web Speech API (Hindi TTS voice announcement)
+ * No external audio file needed — 100% browser-native.
  */
 
 let audioCtx: AudioContext | null = null;
@@ -13,74 +13,136 @@ const getAudioContext = (): AudioContext => {
   return audioCtx;
 };
 
-/** Play a pleasant 3-tone "Payment Received" chime (like a UPI soundbox) */
-export const playPaymentSound = (): void => {
+// ─── Hindi Voice Announcer (Web Speech API) ─────────────────────────────────
+
+const PAYMENT_PHRASES = [
+  'Paisa aa gaya bhai! Seedha bank mein!',
+  'Payment received! Ek dum mast!',
+  'Transaction successful! Bhai ka UPI kaam aaya!',
+  'Paisa mil gaya! Direct account mein!',
+  'Payment ho gaya boss! No commission, no cut!',
+];
+
+/**
+ * Speak a Hindi payment announcement using browser TTS.
+ * Tries to use a Hindi voice; falls back to default voice with Hindi text.
+ */
+export const speakHindiPayment = (vendorName?: string): void => {
+  if (!('speechSynthesis' in window)) {
+    console.warn('VendorUPI: Speech Synthesis not supported in this browser.');
+    return;
+  }
+
+  // Cancel any currently speaking utterance
+  window.speechSynthesis.cancel();
+
+  const randomPhrase = PAYMENT_PHRASES[Math.floor(Math.random() * PAYMENT_PHRASES.length)];
+  const text = vendorName
+    ? `${vendorName}! ${randomPhrase}`
+    : randomPhrase;
+
+  const speak = (voiceList: SpeechSynthesisVoice[]) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    // Try to find a Hindi voice first
+    const hindiVoice = voiceList.find(
+      (v) => v.lang.startsWith('hi') || v.lang.startsWith('HI')
+    );
+    // Fallback to English with male preference for deeper voice
+    const englishMaleVoice = voiceList.find(
+      (v) => v.lang.startsWith('en') && v.name.toLowerCase().includes('male')
+    );
+
+    if (hindiVoice) {
+      utterance.voice = hindiVoice;
+    } else if (englishMaleVoice) {
+      utterance.voice = englishMaleVoice;
+    }
+
+    utterance.lang = hindiVoice ? 'hi-IN' : 'en-IN';
+    utterance.rate = 1.15;   // Slightly fast — Salman style confident!
+    utterance.pitch = 0.82;  // Deeper, more masculine bass voice
+    utterance.volume = 1.0;  // Full volume
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Voices may not be loaded immediately — wait if needed
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length > 0) {
+    speak(voices);
+  } else {
+    window.speechSynthesis.onvoiceschanged = () => {
+      speak(window.speechSynthesis.getVoices());
+    };
+  }
+};
+
+// ─── Chime Tone (Web Audio API) ──────────────────────────────────────────────
+
+/** Play a 3-tone "Payment Received" chime (UPI soundbox style) */
+export const playChime = (): void => {
   try {
     const ctx = getAudioContext();
 
-    // 3-note ascending chime: C5 → E5 → G5
     const notes = [523.25, 659.25, 783.99];
-    const noteDuration = 0.18;
-    const gapBetween = 0.12;
+    const noteDuration = 0.16;
+    const gapBetween = 0.10;
 
     notes.forEach((freq, index) => {
       const startTime = ctx.currentTime + index * (noteDuration + gapBetween);
 
-      // Oscillator (tone generator)
-      const oscillator = ctx.createOscillator();
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(freq, startTime);
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, startTime);
 
-      // Volume envelope (fade in → sustain → fade out)
-      const gainNode = ctx.createGain();
-      gainNode.gain.setValueAtTime(0, startTime);
-      gainNode.gain.linearRampToValueAtTime(0.45, startTime + 0.03);
-      gainNode.gain.linearRampToValueAtTime(0.35, startTime + noteDuration * 0.6);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + noteDuration + 0.05);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.5, startTime + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + noteDuration + 0.06);
 
-      // Add a slight reverb/warmth via a second detuned oscillator
-      const oscillator2 = ctx.createOscillator();
-      oscillator2.type = 'sine';
-      oscillator2.frequency.setValueAtTime(freq * 2, startTime); // octave up
-      const gainNode2 = ctx.createGain();
-      gainNode2.gain.setValueAtTime(0, startTime);
-      gainNode2.gain.linearRampToValueAtTime(0.12, startTime + 0.03);
-      gainNode2.gain.exponentialRampToValueAtTime(0.001, startTime + noteDuration + 0.05);
-
-      oscillator.connect(gainNode);
-      gainNode.connect(ctx.destination);
-
-      oscillator2.connect(gainNode2);
-      gainNode2.connect(ctx.destination);
-
-      oscillator.start(startTime);
-      oscillator.stop(startTime + noteDuration + 0.1);
-
-      oscillator2.start(startTime);
-      oscillator2.stop(startTime + noteDuration + 0.1);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + noteDuration + 0.1);
     });
 
-    // Final long triumphant note
-    const finalTime = ctx.currentTime + notes.length * (noteDuration + gapBetween) + 0.05;
+    // Final triumphant high note
+    const finalTime = ctx.currentTime + notes.length * (noteDuration + gapBetween) + 0.04;
     const finalOsc = ctx.createOscillator();
     finalOsc.type = 'sine';
-    finalOsc.frequency.setValueAtTime(1046.5, finalTime); // C6
+    finalOsc.frequency.setValueAtTime(1046.5, finalTime);
     const finalGain = ctx.createGain();
     finalGain.gain.setValueAtTime(0, finalTime);
-    finalGain.gain.linearRampToValueAtTime(0.4, finalTime + 0.04);
-    finalGain.gain.exponentialRampToValueAtTime(0.001, finalTime + 0.55);
+    finalGain.gain.linearRampToValueAtTime(0.45, finalTime + 0.04);
+    finalGain.gain.exponentialRampToValueAtTime(0.001, finalTime + 0.5);
     finalOsc.connect(finalGain);
     finalGain.connect(ctx.destination);
     finalOsc.start(finalTime);
-    finalOsc.stop(finalTime + 0.6);
+    finalOsc.stop(finalTime + 0.55);
 
   } catch (err) {
-    // Fail silently if Web Audio API is not supported
-    console.warn('VendorUPI Sound: Web Audio API not supported', err);
+    console.warn('VendorUPI Chime: Web Audio API not supported', err);
   }
 };
 
-/** Short single-beep for UI confirmations (save, delete, etc.) */
+// ─── Combined Payment Sound (Chime + Voice) ──────────────────────────────────
+
+/**
+ * Main function: plays chime first, then speaks Hindi announcement.
+ * Call this when QR is generated or payment simulation is triggered.
+ */
+export const playPaymentSound = (vendorName?: string): void => {
+  playChime();
+  // Slight delay so chime finishes before voice speaks
+  setTimeout(() => {
+    speakHindiPayment(vendorName);
+  }, 800);
+};
+
+// ─── Utility Sounds ──────────────────────────────────────────────────────────
+
+/** Short single-beep for UI confirmations */
 export const playConfirmSound = (): void => {
   try {
     const ctx = getAudioContext();

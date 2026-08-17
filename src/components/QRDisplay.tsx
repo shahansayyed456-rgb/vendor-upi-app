@@ -184,9 +184,9 @@ export const QRDisplay: React.FC<QRDisplayProps> = ({
           </button>
 
           <button
-            onClick={playPaymentSound}
+            onClick={() => playPaymentSound(vendor.name)}
             className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-medium transition-all active:scale-95"
-            title="Play Payment Received Sound (Soundbox Demo)"
+            title="🔊 Payment Received Announcement (Hindi Soundbox)"
           >
             <Volume2 className="w-4 h-4" />
           </button>
